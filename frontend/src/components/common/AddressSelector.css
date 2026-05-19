@@ -1,0 +1,92 @@
+/* src/components/common/AddressSelector.css */
+
+.address-selector { display: flex; flex-direction: column; gap: 0; }
+
+.addr-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+@media (min-width: 640px) {
+  .addr-row { grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+}
+
+/* Select wrapper with icon */
+.select-wrap {
+  position: relative;
+}
+
+.addr-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.25rem !important;
+  cursor: pointer;
+}
+
+.addr-select:disabled {
+  background: var(--gray-100);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.select-icon,
+.select-loader {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray-400);
+  pointer-events: none;
+}
+
+.spinning {
+  animation: spin 0.8s linear infinite;
+  color: var(--primary);
+}
+
+/* Required asterisk */
+.req { color: var(--danger); margin-left: 2px; }
+
+/* Street Suggestions Dropdown */
+.street-suggestions {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border: 1.5px solid var(--primary);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  list-style: none;
+  z-index: 500;
+  max-height: 220px;
+  overflow-y: auto;
+  animation: slideDown 0.15s ease;
+}
+
+.street-suggestions li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.875rem;
+  font-size: 0.875rem;
+  color: var(--gray-800);
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.street-suggestions li:last-child { border-bottom: none; }
+
+.street-suggestions li:hover {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+}
+
+.street-suggestions li svg { color: var(--primary); flex-shrink: 0; }
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
