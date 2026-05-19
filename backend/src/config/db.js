@@ -1,37 +1,41 @@
 // src/config/db.js
-// Cấu hình kết nối MySQL sử dụng Connection Pool
-// Connection Pool giúp tái sử dụng kết nối, tránh tạo mới liên tục
 
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
-// Tạo pool kết nối với MySQL
+// IN RA LOG ĐỂ KIỂM TRA BIẾN MÔI TRƯỜNG TRÊN RAILWAY
+console.log('=== DEBUG DB INFO ===');
+console.log('HOST:', process.env.DB_HOST);
+console.log('PORT:', process.env.DB_PORT);
+console.log('USER:', process.env.DB_USER);
+console.log('NAME:', process.env.DB_NAME);
+console.log('=====================');
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 3306,
+  port: Number(process.env.DB_PORT) || 3306, // Đã bọc Number() để tránh lỗi chuỗi
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'bag_store',
-  waitForConnections: true,         // Chờ khi hết connection thay vì báo lỗi
-  connectionLimit: 10,           // Tối đa 10 kết nối đồng thời
-  queueLimit: 0,            // 0 = không giới hạn hàng chờ
-  charset: 'utf8mb4',    // Hỗ trợ tiếng Việt
-  timezone: '+07:00',     // Múi giờ Việt Nam
+  database: process.env.DB_NAME || 'myshop',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  charset: 'utf8mb4',
+  timezone: '+07:00',
   ssl: {
     minVersion: 'TLSv1.2',
     rejectUnauthorized: true
   }
 });
 
-// Kiểm tra kết nối khi khởi động
 (async () => {
   try {
     const conn = await pool.getConnection();
     console.log('✅ Kết nối MySQL thành công!');
-    conn.release(); // Trả connection về pool
+    conn.release();
   } catch (err) {
-    console.error('❌ Kết nối MySQL thất bại:', err.message);
-    process.exit(1); // Thoát ứng dụng nếu không kết nối được DB
+    console.error('❌ Kết nối MySQL thất bại. Chi tiết mã lỗi:', err.code, err.message);
+    process.exit(1);
   }
 })();
 
