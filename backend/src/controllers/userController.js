@@ -1,41 +1,35 @@
-// src/controllers/userController.js  [V7 - MỚI]
-// Upload avatar + lấy chi tiết đơn hàng
+// src/controllers/userController.js
 
-const db     = require('../config/db');
+const db = require('../config/db');
 const multer = require('multer');
-const path   = require('path');
-const fs     = require('fs');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
-// -------------------------------------------------------
-// Multer config cho avatar
-// -------------------------------------------------------
-const avatarDir = path.join(__dirname, '../../uploads/avatars');
-if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
+// 1. Cấu hình Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
-const avatarStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, avatarDir),
-  filename: (req, file, cb) => {
-    const ext  = path.extname(file.originalname).toLowerCase();
-    const name = `avatar_${req.user.id}_${Date.now()}${ext}`;
-    cb(null, name);
+// 2. Thiết lập Storage cho Avatar (Lưu vào folder riêng)
+const avatarStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'bag_store_avatars', // Tạo thư mục riêng cho avatar trên Cloud
+    allowedFormats: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
   },
 });
 
-const avatarFilter = (req, file, cb) => {
-  const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
-  if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
-  else cb(new Error('Chỉ chấp nhận: JPG, PNG, WebP, GIF'));
-};
-
 const uploadAvatarMiddleware = multer({
   storage: avatarStorage,
-  fileFilter: avatarFilter,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
 }).single('avatar');
 
+// -------------------------------------------------------
 // POST /api/user/avatar
+// -------------------------------------------------------
 const uploadAvatar = async (req, res) => {
-  // Wrapper multer error handling
   uploadAvatarMiddleware(req, res, async (err) => {
     if (err) {
       return res.status(400).json({ success: false, message: err.message });
@@ -46,17 +40,10 @@ const uploadAvatar = async (req, res) => {
     }
 
     try {
-      // Xóa avatar cũ (nếu có và không phải URL ngoài)
-      const [users] = await db.query('SELECT avatar_url FROM users WHERE id = ?', [req.user.id]);
-      const oldAvatar = users[0]?.avatar_url;
-      if (oldAvatar && oldAvatar.includes('/uploads/avatars/')) {
-        const oldPath = path.join(__dirname, '../../', oldAvatar.replace(/^.*\/uploads/, 'uploads'));
-        try { fs.unlinkSync(oldPath); } catch (_) {}
-      }
+      // Thuộc tính path bây giờ là Link Cloudinary
+      const avatarUrl = req.file.path;
 
-      const baseUrl   = `${req.protocol}://${req.get('host')}`;
-      const avatarUrl = `${baseUrl}/uploads/avatars/${req.file.filename}`;
-
+      // Lưu link mới vào database
       await db.query('UPDATE users SET avatar_url = ? WHERE id = ?', [avatarUrl, req.user.id]);
 
       return res.json({
@@ -65,30 +52,24 @@ const uploadAvatar = async (req, res) => {
         data: { avatar_url: avatarUrl },
       });
     } catch (dbErr) {
-      // Xóa file đã upload nếu lưu DB lỗi
-      try { fs.unlinkSync(req.file.path); } catch (_) {}
-      return res.status(500).json({ success: false, message: 'Lỗi server.' });
+      return res.status(500).json({ success: false, message: 'Lỗi database khi lưu avatar.' });
     }
   });
 };
 
-// DELETE /api/user/avatar - Xóa avatar, về mặc định
+// -------------------------------------------------------
+// DELETE /api/user/avatar
+// -------------------------------------------------------
 const deleteAvatar = async (req, res) => {
   try {
-    const [users] = await db.query('SELECT avatar_url FROM users WHERE id = ?', [req.user.id]);
-    const oldAvatar = users[0]?.avatar_url;
-
-    if (oldAvatar && oldAvatar.includes('/uploads/avatars/')) {
-      const oldPath = path.join(__dirname, '../../', oldAvatar.replace(/^.*\/uploads/, 'uploads'));
-      try { fs.unlinkSync(oldPath); } catch (_) {}
-    }
-
+    // Chỉ cần set NULL trong DB, không dùng fs.unlinkSync để tránh sập server
     await db.query('UPDATE users SET avatar_url = NULL WHERE id = ?', [req.user.id]);
     return res.json({ success: true, message: 'Đã xóa ảnh đại diện.' });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'Lỗi server.' });
   }
 };
+
 
 // -------------------------------------------------------
 // GET /api/orders/:orderCode/detail - Chi tiết đơn hàng
@@ -134,13 +115,13 @@ const getOrderDetail = async (req, res) => {
       success: true,
       data: {
         ...order,
-        total:        Number(order.total),
-        subtotal:     Number(order.subtotal),
+        total: Number(order.total),
+        subtotal: Number(order.subtotal),
         shipping_fee: Number(order.shipping_fee),
-        discount:     Number(order.discount),
+        discount: Number(order.discount),
         items: items.map(item => ({
           ...item,
-          unit_price:  Number(item.unit_price),
+          unit_price: Number(item.unit_price),
           total_price: Number(item.total_price),
         })),
       },
