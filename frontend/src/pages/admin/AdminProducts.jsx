@@ -1,23 +1,24 @@
 // src/pages/admin/AdminProducts.jsx  [V5 - THÊM MODAL TẠO SẢN PHẨM + UPLOAD ẢNH]
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Link }          from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { RefreshCw, Search, Star, Eye, EyeOff, X, Upload, Plus, ImageIcon } from 'lucide-react';
 import { adminAPI, categoryAPI } from '../../services/api';
-import api               from '../../services/api';
-import { formatPrice }   from '../../utils/helpers';
+import api from '../../services/api';
+import { formatPrice } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 import './AdminDashboard.css';
 import './AdminProducts.css';
 
 const AdminProducts = () => {
-  const [products, setProducts]     = useState([]);
-  const [total, setTotal]           = useState(0);
-  const [page, setPage]             = useState(1);
-  const [search, setSearch]         = useState('');
+  const [products, setProducts] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [loading, setLoading]       = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -60,8 +61,8 @@ const AdminProducts = () => {
       <aside className="admin-sidebar">
         <div className="admin-logo">👜 Admin</div>
         <nav className="admin-nav">
-          <Link to="/admin"          className="admin-nav-link">📊 Tổng quan</Link>
-          <Link to="/admin/orders"   className="admin-nav-link">📋 Đơn hàng</Link>
+          <Link to="/admin" className="admin-nav-link">📊 Tổng quan</Link>
+          <Link to="/admin/orders" className="admin-nav-link">📋 Đơn hàng</Link>
           <Link to="/admin/products" className="admin-nav-link active">📦 Sản phẩm</Link>
           <Link to="/admin/contacts" className="admin-nav-link">💬 Liên hệ</Link>
         </nav>
@@ -109,6 +110,7 @@ const AdminProducts = () => {
                   <th>Đánh giá</th>
                   <th>Nổi bật</th>
                   <th>Trạng thái</th>
+                  <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -173,6 +175,15 @@ const AdminProducts = () => {
                         {p.is_active ? <><Eye size={13} /> Hiện</> : <><EyeOff size={13} /> Ẩn</>}
                       </button>
                     </td>
+                    <td>
+                      <button
+                        className="btn btn-sm btn-outline"
+                        style={{ padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        onClick={() => setEditingProduct(p)}
+                      >
+                        ✏️ Sửa
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -196,6 +207,15 @@ const AdminProducts = () => {
           onSuccess={() => { setShowAddModal(false); fetchProducts(); }}
         />
       )}
+
+      {/* Modal sửa sản phẩm */}
+      {editingProduct && (
+        <EditProductModal
+          product={editingProduct}
+          onClose={() => setEditingProduct(null)}
+          onSuccess={() => { setEditingProduct(null); fetchProducts(); }}
+        />
+      )}
     </div>
   );
 };
@@ -206,9 +226,9 @@ const AdminProducts = () => {
 const AddProductModal = ({ onClose, onSuccess }) => {
   const [categories, setCategories] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  const [previews, setPreviews]     = useState([]); // preview URLs
-  const [files, setFiles]           = useState([]);
-  const fileInputRef                = useRef(null);
+  const [previews, setPreviews] = useState([]); // preview URLs
+  const [files, setFiles] = useState([]);
+  const fileInputRef = useRef(null);
 
   const [form, setForm] = useState({
     category_id: '', name: '', slug: '', sku: '',
@@ -260,7 +280,7 @@ const AddProductModal = ({ onClose, onSuccess }) => {
   };
 
   const removeImage = (idx) => {
-    const newFiles    = files.filter((_, i) => i !== idx);
+    const newFiles = files.filter((_, i) => i !== idx);
     const newPreviews = previews.filter((_, i) => i !== idx);
     URL.revokeObjectURL(previews[idx]); // giải phóng memory
     setFiles(newFiles);
@@ -272,9 +292,9 @@ const AddProductModal = ({ onClose, onSuccess }) => {
 
     // Validate
     if (!form.category_id) return toast.error('Vui lòng chọn danh mục.');
-    if (!form.name.trim())  return toast.error('Vui lòng nhập tên sản phẩm.');
-    if (!form.sku.trim())   return toast.error('Vui lòng nhập mã SKU.');
-    if (!form.price)        return toast.error('Vui lòng nhập giá sản phẩm.');
+    if (!form.name.trim()) return toast.error('Vui lòng nhập tên sản phẩm.');
+    if (!form.sku.trim()) return toast.error('Vui lòng nhập mã SKU.');
+    if (!form.price) return toast.error('Vui lòng nhập giá sản phẩm.');
     if (Number(form.price) <= 0) return toast.error('Giá phải lớn hơn 0.');
 
     setSubmitting(true);
@@ -472,6 +492,213 @@ const AddProductModal = ({ onClose, onSuccess }) => {
               </button>
               <button type="submit" className="btn btn-primary" disabled={submitting}>
                 {submitting ? '⏳ Đang tạo...' : '✅ Tạo Sản Phẩm'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// EDIT PRODUCT MODAL (CẬP NHẬT SẢN PHẨM)
+// ============================================================
+const EditProductModal = ({ product, onClose, onSuccess }) => {
+  const [categories, setCategories] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [previews, setPreviews] = useState([]);
+  const [files, setFiles] = useState([]);
+  const fileInputRef = useRef(null);
+
+  // Khởi tạo form với dữ liệu của sản phẩm cũ
+  const [form, setForm] = useState({
+    category_id: product.category_id || '',
+    name: product.name || '',
+    slug: product.slug || '',
+    sku: product.sku || '',
+    description: product.description || '',
+    material: product.material || '',
+    compartments: product.compartments || 1,
+    weight_capacity: product.weight_capacity || '',
+    price: product.price || '',
+    sale_price: product.sale_price || '',
+    stock: product.stock || 0,
+    is_featured: !!product.is_featured,
+  });
+
+  useEffect(() => {
+    categoryAPI.getAll().then(res => {
+      const flat = [];
+      const flatten = (cats, prefix = '') => {
+        cats.forEach(c => {
+          flat.push({ id: c.id, name: prefix + c.name });
+          if (c.children?.length) flatten(c.children, prefix + '— ');
+        });
+      };
+      flatten(res.data || []);
+      setCategories(flat);
+    });
+  }, []);
+
+  const set = (field) => (e) => {
+    const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setForm(p => ({ ...p, [field]: val }));
+  };
+
+  const handleFileChange = (e) => {
+    const selected = Array.from(e.target.files);
+    if (selected.length === 0) return;
+
+    const combined = [...files, ...selected].slice(0, 8);
+    setFiles(combined);
+
+    const newPreviews = combined.map(f => URL.createObjectURL(f));
+    setPreviews(newPreviews);
+  };
+
+  const removeImage = (idx) => {
+    const newFiles = files.filter((_, i) => i !== idx);
+    const newPreviews = previews.filter((_, i) => i !== idx);
+    URL.revokeObjectURL(previews[idx]);
+    setFiles(newFiles);
+    setPreviews(newPreviews);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.category_id) return toast.error('Vui lòng chọn danh mục.');
+    if (!form.name.trim()) return toast.error('Vui lòng nhập tên sản phẩm.');
+    if (!form.price) return toast.error('Vui lòng nhập giá sản phẩm.');
+
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      Object.entries(form).forEach(([key, val]) => {
+        if (val !== null && val !== undefined) {
+          formData.append(key, val);
+        }
+      });
+
+      // Nếu có ảnh mới, thêm vào formData
+      if (files.length > 0) {
+        files.forEach(file => formData.append('images', file));
+      }
+
+      // Gọi API PUT để cập nhật
+      await api.put(`/products/${product.id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      toast.success('Cập nhật sản phẩm thành công!');
+      previews.forEach(url => URL.revokeObjectURL(url));
+      onSuccess();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Cập nhật thất bại.');
+    } finally { setSubmitting(false); }
+  };
+
+  const handleOverlayClick = (e) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  return (
+    <div className="admin-modal-overlay" onClick={handleOverlayClick}>
+      <div className="admin-modal">
+        <div className="admin-modal-header">
+          <h2>Sửa Sản Phẩm: {product.name}</h2>
+          <button className="admin-modal-close" onClick={onClose}><X size={20} /></button>
+        </div>
+
+        <div className="admin-modal-body">
+          <form onSubmit={handleSubmit}>
+            {/* --- Các trường Input Text (Giống hệt AddProductModal) --- */}
+            <div className="modal-form-row">
+              <div className="form-group">
+                <label className="form-label">Danh mục *</label>
+                <select className="form-input" value={form.category_id} onChange={set('category_id')} required>
+                  <option value="">-- Chọn danh mục --</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Mã SKU *</label>
+                <input className="form-input" value={form.sku} onChange={set('sku')} required />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Tên sản phẩm *</label>
+              <input className="form-input" value={form.name} onChange={set('name')} required />
+            </div>
+
+            <div className="modal-form-row">
+              <div className="form-group">
+                <label className="form-label">Giá gốc (VNĐ) *</label>
+                <input type="number" className="form-input" value={form.price} onChange={set('price')} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Giá KM (VNĐ)</label>
+                <input type="number" className="form-input" value={form.sale_price} onChange={set('sale_price')} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Tồn kho *</label>
+                <input type="number" className="form-input" value={form.stock} onChange={set('stock')} required />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Mô tả sản phẩm</label>
+              <textarea className="form-input" rows={3} value={form.description} onChange={set('description')} />
+            </div>
+
+            <div className="form-group">
+              <label className="checkbox-label">
+                <input type="checkbox" checked={form.is_featured} onChange={set('is_featured')} />
+                <Star size={16} color="var(--warning)" fill={form.is_featured ? "var(--warning)" : "none"} />
+                Đánh dấu là sản phẩm nổi bật
+              </label>
+            </div>
+
+            {/* Upload ảnh mới (Nếu có) */}
+            <div className="form-group">
+              <label className="form-label" style={{ color: 'var(--primary)' }}>
+                <ImageIcon size={15} style={{ display: 'inline', marginRight: '0.375rem' }} />
+                Cập nhật ảnh (Tùy chọn)
+              </label>
+              <p style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginBottom: '10px' }}>
+                * Nếu không chọn ảnh nào, hệ thống sẽ giữ nguyên ảnh cũ. Nếu bạn upload ảnh mới, <b>toàn bộ ảnh cũ sẽ bị xóa bỏ</b> và thay bằng ảnh mới.
+              </p>
+
+              <div
+                className="upload-dropzone"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload size={28} color="var(--gray-400)" />
+                <p>Nhấn để chọn ảnh mới (Tối đa 8 ảnh)</p>
+                <input
+                  ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple
+                  style={{ display: 'none' }} onChange={handleFileChange}
+                />
+              </div>
+
+              {previews.length > 0 && (
+                <div className="upload-previews">
+                  {previews.map((url, idx) => (
+                    <div key={idx} className="preview-item">
+                      <img src={url} alt={`Ảnh ${idx + 1}`} />
+                      <button type="button" className="preview-remove" onClick={() => removeImage(idx)}><X size={12} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="admin-modal-footer">
+              <button type="button" className="btn btn-ghost" onClick={onClose} disabled={submitting}>Hủy</button>
+              <button type="submit" className="btn btn-primary" disabled={submitting}>
+                {submitting ? '⏳ Đang lưu...' : '💾 Lưu Thay Đổi'}
               </button>
             </div>
           </form>

@@ -281,6 +281,7 @@ const createProduct = async (req, res) => {
 };
 
 // PUT /api/products/:id  (Admin only)
+// PUT /api/products/:id  (Admin only)
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -295,19 +296,51 @@ const updateProduct = async (req, res) => {
 
     allowed.forEach(key => {
       if (fields[key] !== undefined) {
-        updates.push(`${key} = ?`);
-        values.push(fields[key]);
+        // FormData luôn gửi boolean dạng chuỗi 'true' hoặc 'false'
+        if (key === 'is_featured' || key === 'is_active') {
+          updates.push(`${key} = ?`);
+          values.push(fields[key] === 'true' || fields[key] === 1 ? 1 : 0);
+        } else {
+          updates.push(`${key} = ?`);
+          values.push(fields[key]);
+        }
       }
     });
 
-    if (updates.length === 0)
-      return res.status(400).json({ success: false, message: 'Không có dữ liệu cập nhật.' });
+    // 1. CẬP NHẬT THÔNG TIN CHỮ VÀO BẢNG products
+    if (updates.length > 0) {
+      const queryValues = [...values, id];
+      await db.query(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`, queryValues);
+    }
 
-    values.push(id);
-    await db.query(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`, values);
+    // 2. CẬP NHẬT ẢNH: Nếu có ảnh mới đẩy lên
+    if (req.files && req.files.length > 0) {
+      // Xóa link ảnh cũ trong DB
+      await db.query('DELETE FROM product_images WHERE product_id = ?', [id]);
+
+      // Thêm ảnh mới vào DB
+      for (let i = 0; i < req.files.length; i++) {
+        const imageUrl = req.files[i].path; // Link Cloudinary
+        const isPrimary = i === 0 ? 1 : 0;
+
+        await db.query(
+          `INSERT INTO product_images (product_id, image_url, is_primary, sort_order) VALUES (?, ?, ?, ?)`,
+          [id, imageUrl, isPrimary, i]
+        );
+      }
+    }
+
+    // Nếu không có chữ và cũng không có ảnh nào để cập nhật
+    if (updates.length === 0 && (!req.files || req.files.length === 0)) {
+      return res.status(400).json({ success: false, message: 'Không có dữ liệu cập nhật.' });
+    }
 
     return res.json({ success: true, message: 'Cập nhật sản phẩm thành công!' });
   } catch (err) {
+    console.error('Lỗi khi update sản phẩm:', err);
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ success: false, message: 'Slug hoặc SKU đã tồn tại.' });
+    }
     return res.status(500).json({ success: false, message: 'Lỗi server.' });
   }
 };

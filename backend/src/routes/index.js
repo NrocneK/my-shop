@@ -1,91 +1,92 @@
 // src/routes/index.js  [V10 - HOÀN CHỈNH với payment + blog + order tracking]
 
-const express      = require('express');
-const router       = express.Router();
+const express = require('express');
+const router = express.Router();
 const { authenticate, optionalAuthenticate, requireAdmin } = require('../middleware/auth');
 
-const authCtrl     = require('../controllers/authController');
-const adminAuthCtrl= require('../controllers/adminAuthController');
-const productCtrl  = require('../controllers/productController');
+const authCtrl = require('../controllers/authController');
+const adminAuthCtrl = require('../controllers/adminAuthController');
+const productCtrl = require('../controllers/productController');
 const categoryCtrl = require('../controllers/categoryController');
-const orderCtrl    = require('../controllers/orderController');
-const contactCtrl  = require('../controllers/contactController');
-const addressCtrl  = require('../controllers/addressController');
-const cartCtrl     = require('../controllers/cartController');
-const reviewCtrl   = require('../controllers/reviewController');
-const userCtrl     = require('../controllers/userController');
-const paymentCtrl  = require('../controllers/paymentController');
-const blogCtrl     = require('../controllers/blogController');
-const db           = require('../config/db');
+const orderCtrl = require('../controllers/orderController');
+const contactCtrl = require('../controllers/contactController');
+const addressCtrl = require('../controllers/addressController');
+const cartCtrl = require('../controllers/cartController');
+const reviewCtrl = require('../controllers/reviewController');
+const userCtrl = require('../controllers/userController');
+const paymentCtrl = require('../controllers/paymentController');
+const blogCtrl = require('../controllers/blogController');
+const db = require('../config/db');
 
 // ================================ ADMIN AUTH
 router.post('/admin-auth/login', adminAuthCtrl.adminLogin);
-router.get ('/admin-auth/me',    authenticate, adminAuthCtrl.adminGetMe);
+router.get('/admin-auth/me', authenticate, adminAuthCtrl.adminGetMe);
 
 // ================================ AUTH
-router.post('/auth/register',            authCtrl.register);
-router.post('/auth/login',               authCtrl.login);
-router.get ('/auth/verify-email',        authCtrl.verifyEmail);
+router.post('/auth/register', authCtrl.register);
+router.post('/auth/login', authCtrl.login);
+router.get('/auth/verify-email', authCtrl.verifyEmail);
 router.post('/auth/resend-verification', authCtrl.resendVerification);
-router.post('/auth/forgot-password',     authCtrl.forgotPassword);
-router.post('/auth/reset-password',      authCtrl.resetPassword);
-router.get ('/auth/me',                  authenticate, authCtrl.getMe);
-router.put ('/auth/profile',             authenticate, authCtrl.updateProfile);
+router.post('/auth/forgot-password', authCtrl.forgotPassword);
+router.post('/auth/reset-password', authCtrl.resetPassword);
+router.get('/auth/me', authenticate, authCtrl.getMe);
+router.put('/auth/profile', authenticate, authCtrl.updateProfile);
 
 // ================================ USER
-router.post  ('/user/avatar', authenticate, userCtrl.uploadAvatar);
+router.post('/user/avatar', authenticate, userCtrl.uploadAvatar);
 router.delete('/user/avatar', authenticate, userCtrl.deleteAvatar);
 
 // ================================ CART
-router.get   ('/cart',       authenticate, cartCtrl.getCart);
-router.post  ('/cart/sync',  authenticate, cartCtrl.syncCart);
-router.post  ('/cart/add',   authenticate, cartCtrl.addToCart);
-router.put   ('/cart/:id',   authenticate, cartCtrl.updateCartItem);
-router.delete('/cart/:id',   authenticate, cartCtrl.removeCartItem);
-router.delete('/cart',       authenticate, cartCtrl.clearCart);
+router.get('/cart', authenticate, cartCtrl.getCart);
+router.post('/cart/sync', authenticate, cartCtrl.syncCart);
+router.post('/cart/add', authenticate, cartCtrl.addToCart);
+router.put('/cart/:id', authenticate, cartCtrl.updateCartItem);
+router.delete('/cart/:id', authenticate, cartCtrl.removeCartItem);
+router.delete('/cart', authenticate, cartCtrl.clearCart);
 
 // ================================ ADDRESSES
-router.get   ('/addresses',             authenticate, addressCtrl.getAddresses);
-router.post  ('/addresses',             authenticate, addressCtrl.createAddress);
-router.put   ('/addresses/:id',         authenticate, addressCtrl.updateAddress);
-router.delete('/addresses/:id',         authenticate, addressCtrl.deleteAddress);
-router.patch ('/addresses/:id/default', authenticate, addressCtrl.setDefault);
+router.get('/addresses', authenticate, addressCtrl.getAddresses);
+router.post('/addresses', authenticate, addressCtrl.createAddress);
+router.put('/addresses/:id', authenticate, addressCtrl.updateAddress);
+router.delete('/addresses/:id', authenticate, addressCtrl.deleteAddress);
+router.patch('/addresses/:id/default', authenticate, addressCtrl.setDefault);
 
 // ================================ CATEGORIES
 router.get('/categories', categoryCtrl.getCategories);
 
 // ================================ PRODUCTS
-router.get('/products',          productCtrl.getProducts);
+router.get('/products', productCtrl.getProducts);
 router.get('/products/featured', productCtrl.getFeaturedProducts);
-router.get('/products/:slug',    productCtrl.getProductBySlug);
+router.get('/products/:slug', productCtrl.getProductBySlug);
 
 router.post(
   '/products', authenticate, requireAdmin,
   (req, res, next) => { productCtrl.uploadMiddleware(req, res, (err) => { if (err) return res.status(400).json({ success: false, message: err.message }); next(); }); },
   productCtrl.createProduct
 );
-router.put('/products/:id', authenticate, requireAdmin, productCtrl.updateProduct);
+// router.put('/products/:id', authenticate, requireAdmin, productCtrl.updateProduct);
+router.put('/products/:id', authenticate, requireAdmin, productCtrl.uploadMiddleware, productCtrl.updateProduct);
 
 // ================================ REVIEWS
-router.get ('/reviews', reviewCtrl.getReviews);
+router.get('/reviews', reviewCtrl.getReviews);
 router.post('/reviews', authenticate, reviewCtrl.createReview);
 
 // ================================ ORDERS
-router.post  ('/orders',                  optionalAuthenticate, orderCtrl.createOrder);
-router.get   ('/orders/my',              authenticate, orderCtrl.getMyOrders);
-router.get   ('/orders/track/:orderCode', optionalAuthenticate, orderCtrl.getOrderByCode);
-router.get   ('/orders/:orderCode/detail', optionalAuthenticate, userCtrl.getOrderDetail);
-router.patch ('/orders/:id/status',      authenticate, requireAdmin, orderCtrl.updateOrderStatus);
+router.post('/orders', optionalAuthenticate, orderCtrl.createOrder);
+router.get('/orders/my', authenticate, orderCtrl.getMyOrders);
+router.get('/orders/track/:orderCode', optionalAuthenticate, orderCtrl.getOrderByCode);
+router.get('/orders/:orderCode/detail', optionalAuthenticate, userCtrl.getOrderDetail);
+router.patch('/orders/:id/status', authenticate, requireAdmin, orderCtrl.updateOrderStatus);
 
 // ================================ PAYMENT
 // Chuyển khoản ngân hàng: lấy thông tin QR
 router.get('/payment/bank-info/:orderId', optionalAuthenticate, paymentCtrl.getBankInfo);
 
 // MoMo
-router.post('/payment/momo/create',          optionalAuthenticate, paymentCtrl.createMoMoPayment);
-router.post('/payment/momo/ipn',             paymentCtrl.momoIPN);        // webhook từ MoMo, không cần auth
-router.get ('/payment/momo/result',          paymentCtrl.momoResult);     // redirect từ MoMo
-router.get ('/payment/momo/status/:orderId', authenticate, paymentCtrl.checkMoMoStatus);
+router.post('/payment/momo/create', optionalAuthenticate, paymentCtrl.createMoMoPayment);
+router.post('/payment/momo/ipn', paymentCtrl.momoIPN);        // webhook từ MoMo, không cần auth
+router.get('/payment/momo/result', paymentCtrl.momoResult);     // redirect từ MoMo
+router.get('/payment/momo/status/:orderId', authenticate, paymentCtrl.checkMoMoStatus);
 
 // ================================ COUPONS
 router.post('/coupons/validate', async (req, res) => {
@@ -102,7 +103,7 @@ router.post('/coupons/validate', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Mã giảm giá không hợp lệ.' });
 
     const coupon = coupons[0];
-    const sub    = Number(subtotal);
+    const sub = Number(subtotal);
     if (sub < Number(coupon.min_order))
       return res.status(400).json({ success: false, message: `Đơn tối thiểu ${Number(coupon.min_order).toLocaleString('vi-VN')}đ` });
 
@@ -117,25 +118,25 @@ router.post('/coupons/validate', async (req, res) => {
 });
 
 // ================================ CONTACT
-router.post  ('/contact',            contactCtrl.sendContact);
-router.get   ('/contact',            authenticate, requireAdmin, contactCtrl.getContacts);
-router.patch ('/contact/:id/status', authenticate, requireAdmin, contactCtrl.updateContactStatus);
+router.post('/contact', contactCtrl.sendContact);
+router.get('/contact', authenticate, requireAdmin, contactCtrl.getContacts);
+router.patch('/contact/:id/status', authenticate, requireAdmin, contactCtrl.updateContactStatus);
 
 // ================================ BLOG
-router.get('/blog',           blogCtrl.getBlogList);
-router.get('/blog/:slug',     blogCtrl.getBlogPost);
-router.post('/blog',          authenticate, requireAdmin, blogCtrl.createBlogPost);
-router.put ('/blog/:id',      authenticate, requireAdmin, blogCtrl.updateBlogPost);
-router.delete('/blog/:id',    authenticate, requireAdmin, blogCtrl.deleteBlogPost);
+router.get('/blog', blogCtrl.getBlogList);
+router.get('/blog/:slug', blogCtrl.getBlogPost);
+router.post('/blog', authenticate, requireAdmin, blogCtrl.createBlogPost);
+router.put('/blog/:id', authenticate, requireAdmin, blogCtrl.updateBlogPost);
+router.delete('/blog/:id', authenticate, requireAdmin, blogCtrl.deleteBlogPost);
 
 // ================================ ADMIN STATS & MANAGEMENT
 router.get('/admin/stats', authenticate, requireAdmin, async (req, res) => {
   try {
-    const [[orders]]   = await db.query(`SELECT COUNT(*) as total, COALESCE(SUM(total),0) as revenue FROM orders WHERE status != 'cancelled'`);
+    const [[orders]] = await db.query(`SELECT COUNT(*) as total, COALESCE(SUM(total),0) as revenue FROM orders WHERE status != 'cancelled'`);
     const [[products]] = await db.query(`SELECT COUNT(*) as total FROM products WHERE is_active = 1`);
-    const [[users]]    = await db.query(`SELECT COUNT(*) as total FROM users WHERE role = 'customer'`);
+    const [[users]] = await db.query(`SELECT COUNT(*) as total FROM users WHERE role = 'customer'`);
     const [[contacts]] = await db.query(`SELECT COUNT(*) as total FROM contact_messages WHERE status = 'new'`);
-    const [revenue7d]  = await db.query(`SELECT DATE(created_at) as date, SUM(total) as revenue, COUNT(*) as orders FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND status != 'cancelled' GROUP BY DATE(created_at) ORDER BY date ASC`);
+    const [revenue7d] = await db.query(`SELECT DATE(created_at) as date, SUM(total) as revenue, COUNT(*) as orders FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND status != 'cancelled' GROUP BY DATE(created_at) ORDER BY date ASC`);
     const [recentOrders] = await db.query(`SELECT o.order_code, o.total, o.status, o.created_at, COALESCE(u.full_name, o.ship_name) as customer_name FROM orders o LEFT JOIN users u ON u.id = o.user_id ORDER BY o.created_at DESC LIMIT 5`);
     return res.json({ success: true, data: { stats: { total_orders: Number(orders.total), total_revenue: Number(orders.revenue), total_products: Number(products.total), total_customers: Number(users.total), new_contacts: Number(contacts.total) }, revenue7d: revenue7d.map(r => ({ ...r, revenue: Number(r.revenue) })), recentOrders: recentOrders.map(r => ({ ...r, total: Number(r.total) })) } });
   } catch (err) { return res.status(500).json({ success: false, message: 'Lỗi server.' }); }
@@ -167,7 +168,7 @@ router.get('/admin/products', authenticate, requireAdmin, async (req, res) => {
   } catch (err) { return res.status(500).json({ success: false, message: 'Lỗi server.' }); }
 });
 
-router.patch('/admin/products/:id/toggle',   authenticate, requireAdmin, async (req, res) => { try { await db.query('UPDATE products SET is_active = !is_active WHERE id = ?', [req.params.id]); return res.json({ success: true }); } catch { return res.status(500).json({ success: false }); } });
+router.patch('/admin/products/:id/toggle', authenticate, requireAdmin, async (req, res) => { try { await db.query('UPDATE products SET is_active = !is_active WHERE id = ?', [req.params.id]); return res.json({ success: true }); } catch { return res.status(500).json({ success: false }); } });
 router.patch('/admin/products/:id/featured', authenticate, requireAdmin, async (req, res) => { try { await db.query('UPDATE products SET is_featured = !is_featured WHERE id = ?', [req.params.id]); return res.json({ success: true }); } catch { return res.status(500).json({ success: false }); } });
 
 module.exports = router;
