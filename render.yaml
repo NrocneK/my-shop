@@ -1,0 +1,15 @@
+# backend/render.yaml
+# Cấu hình deploy tự động trên Render
+# Tài liệu: https://render.com/docs/yaml-spec
+
+services:
+  - type: web
+    name: bagstore-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+    autoDeploy: true   # Tự động deploy khi push lên GitHub

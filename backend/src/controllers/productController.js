@@ -1,62 +1,37 @@
-// src/controllers/productController.js  [V5 - THÊM createWithImages]
+// src/controllers/productController.js  [PRODUCTION - Cloudinary]
 
-const db = require('../config/db');
-const multer = require('multer');
-// const path   = require('path');
-// const fs     = require('fs');
+const db         = require('../config/db');
+const multer     = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
-// Cấu hình Cloudinary bằng biến môi trường
+// ─── Cloudinary config ────────────────────────────────────────
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Thiết lập CloudinaryStorage cho Multer
+// ─── Multer + CloudinaryStorage ───────────────────────────────
 const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
+  cloudinary,
   params: {
-    folder: 'bag_store_products', // Tên thư mục sẽ tự tạo trên Cloudinary
-    allowedFormats: ['jpg', 'jpeg', 'png', 'webp'],
+    folder:          'bagstore/products',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [
+      { width: 800, height: 800, crop: 'limit', quality: 'auto:good' }
+    ],
   },
 });
 
-// Export multer middleware để dùng trong routes
 const uploadMiddleware = multer({
-  storage: storage,
+  storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per file
-}).array('images', 8); // tối đa 8 ảnh
+}).array('images', 8);
 
-// -------------------------------------------------------
-// Multer config: upload ảnh sản phẩm
-// -------------------------------------------------------
-// const uploadDir = path.join(__dirname, '../../uploads/products');
-// if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => cb(null, uploadDir),
-//   filename: (req, file, cb) => {
-//     const ext = path.extname(file.originalname).toLowerCase();
-//     const name = `product_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
-//     cb(null, name);
-//   },
-// });
-
-// const fileFilter = (req, file, cb) => {
-//   const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
-//   const ext = path.extname(file.originalname).toLowerCase();
-//   if (allowed.includes(ext)) cb(null, true);
-//   else cb(new Error('Chỉ chấp nhận file ảnh: JPG, PNG, WebP'));
-// };
-
-// // Export multer middleware để dùng trong routes
-// const uploadMiddleware = multer({
-//   storage,
-//   fileFilter,
-//   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per file
-// }).array('images', 8); // tối đa 8 ảnh
+// ─── Helper: lấy URL ảnh (Cloudinary hoặc local dev) ─────────
+// Cloudinary trả về .path hoặc .secure_url tùy version
+const getImageUrl = (file) => file.secure_url || file.path || '';
 
 // -------------------------------------------------------
 // GET /api/products — Danh sách với filter/sort/pagination
@@ -68,8 +43,8 @@ const getProducts = async (req, res) => {
       sort = 'newest', page = 1, limit = 12,
     } = req.query;
 
-    let where = ['p.is_active = 1'];
-    let params = [];
+    const where  = ['p.is_active = 1'];
+    const params = [];
 
     if (category) {
       where.push('(c.slug = ? OR pc.slug = ?)');
@@ -88,27 +63,32 @@ const getProducts = async (req, res) => {
       params.push(Number(max_price));
     }
 
-    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const whereClause = `WHERE ${where.join(' AND ')}`;
     const sortMap = {
-      newest: 'p.created_at DESC',
-      price_asc: 'COALESCE(p.sale_price, p.price) ASC',
+      newest:     'p.created_at DESC',
+      price_asc:  'COALESCE(p.sale_price, p.price) ASC',
       price_desc: 'COALESCE(p.sale_price, p.price) DESC',
-      popular: 'p.sold_count DESC',
-      rating: 'p.rating_avg DESC',
+      popular:    'p.sold_count DESC',
+      rating:     'p.rating_avg DESC',
     };
     const orderBy = sortMap[sort] || sortMap.newest;
-    const offset = (Number(page) - 1) * Number(limit);
+    const offset  = (Number(page) - 1) * Number(limit);
 
     const [products] = await db.query(
       `SELECT
-         p.id, p.name, p.slug, p.sku, p.price, p.sale_price,
-         p.stock, p.sold_count, p.rating_avg, p.rating_count, p.is_featured,
-         c.name AS category_name, c.slug AS category_slug,
+         p.id, p.name, p.slug, p.sku,
+         p.price, p.sale_price,
+         p.stock, p.sold_count,
+         p.rating_avg, p.rating_count,
+         p.is_featured,
+         c.name  AS category_name,
+         c.slug  AS category_slug,
          img.image_url AS primary_image
        FROM products p
-       JOIN categories c ON p.category_id = c.id
+       JOIN  categories c  ON p.category_id = c.id
        LEFT JOIN categories pc ON c.parent_id = pc.id
-       LEFT JOIN product_images img ON img.product_id = p.id AND img.is_primary = 1
+       LEFT JOIN product_images img
+              ON img.product_id = p.id AND img.is_primary = 1
        ${whereClause}
        GROUP BY p.id
        ORDER BY ${orderBy}
@@ -116,10 +96,10 @@ const getProducts = async (req, res) => {
       [...params, Number(limit), offset]
     );
 
-    const [countResult] = await db.query(
+    const [[{ total }]] = await db.query(
       `SELECT COUNT(DISTINCT p.id) AS total
        FROM products p
-       JOIN categories c ON p.category_id = c.id
+       JOIN  categories c  ON p.category_id = c.id
        LEFT JOIN categories pc ON c.parent_id = pc.id
        ${whereClause}`,
       params
@@ -127,12 +107,16 @@ const getProducts = async (req, res) => {
 
     return res.json({
       success: true,
-      data: products,
+      data: products.map(p => ({
+        ...p,
+        price:      Number(p.price),
+        sale_price: p.sale_price ? Number(p.sale_price) : null,
+      })),
       pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total: countResult[0].total,
-        total_pages: Math.ceil(countResult[0].total / Number(limit)),
+        page:        Number(page),
+        limit:       Number(limit),
+        total,
+        total_pages: Math.ceil(total / Number(limit)),
       },
     });
   } catch (err) {
@@ -141,34 +125,53 @@ const getProducts = async (req, res) => {
   }
 };
 
+// -------------------------------------------------------
 // GET /api/products/featured
+// -------------------------------------------------------
 const getFeaturedProducts = async (req, res) => {
   try {
     const [products] = await db.query(
       `SELECT
-         p.id, p.name, p.slug, p.price, p.sale_price,
+         p.id, p.name, p.slug,
+         p.price, p.sale_price,
          p.rating_avg, p.rating_count, p.sold_count,
          img.image_url AS primary_image
        FROM products p
-       LEFT JOIN product_images img ON img.product_id = p.id AND img.is_primary = 1
+       LEFT JOIN product_images img
+              ON img.product_id = p.id AND img.is_primary = 1
        WHERE p.is_featured = 1 AND p.is_active = 1
+       ORDER BY p.sold_count DESC
        LIMIT 8`
     );
-    return res.json({ success: true, data: products });
+    return res.json({
+      success: true,
+      data: products.map(p => ({
+        ...p,
+        price:      Number(p.price),
+        sale_price: p.sale_price ? Number(p.sale_price) : null,
+      })),
+    });
   } catch (err) {
+    console.error('getFeaturedProducts error:', err);
     return res.status(500).json({ success: false, message: 'Lỗi server.' });
   }
 };
 
+// -------------------------------------------------------
 // GET /api/products/:slug
+// -------------------------------------------------------
 const getProductBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
+
     const [products] = await db.query(
-      `SELECT p.*, c.name AS category_name, c.slug AS category_slug,
-              pc.name AS parent_category_name, pc.slug AS parent_category_slug
+      `SELECT p.*,
+              c.name  AS category_name,
+              c.slug  AS category_slug,
+              pc.name AS parent_category_name,
+              pc.slug AS parent_category_slug
        FROM products p
-       JOIN categories c ON p.category_id = c.id
+       JOIN  categories c  ON p.category_id = c.id
        LEFT JOIN categories pc ON c.parent_id = pc.id
        WHERE p.slug = ? AND p.is_active = 1`,
       [slug]
@@ -179,19 +182,45 @@ const getProductBySlug = async (req, res) => {
 
     const product = products[0];
 
-    const [images] = await db.query('SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order', [product.id]);
-    const [variants] = await db.query('SELECT * FROM product_variants WHERE product_id = ?', [product.id]);
-    const [related] = await db.query(
-      `SELECT p.id, p.name, p.slug, p.price, p.sale_price, p.rating_avg,
+    const [images]   = await db.query(
+      'SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order',
+      [product.id]
+    );
+    const [variants] = await db.query(
+      'SELECT * FROM product_variants WHERE product_id = ?',
+      [product.id]
+    );
+
+    // FIX: Tăng limit lên 8 để carousel có đủ slide để kéo
+    const [related]  = await db.query(
+      `SELECT p.id, p.name, p.slug,
+              p.price, p.sale_price,
+              p.rating_avg, p.rating_count,
               img.image_url AS primary_image
        FROM products p
-       LEFT JOIN product_images img ON img.product_id = p.id AND img.is_primary = 1
+       LEFT JOIN product_images img
+              ON img.product_id = p.id AND img.is_primary = 1
        WHERE p.category_id = ? AND p.id != ? AND p.is_active = 1
-       LIMIT 4`,
+       ORDER BY p.sold_count DESC
+       LIMIT 8`,
       [product.category_id, product.id]
     );
 
-    return res.json({ success: true, data: { ...product, images, variants, related } });
+    return res.json({
+      success: true,
+      data: {
+        ...product,
+        price:      Number(product.price),
+        sale_price: product.sale_price ? Number(product.sale_price) : null,
+        images,
+        variants,
+        related: related.map(p => ({
+          ...p,
+          price:      Number(p.price),
+          sale_price: p.sale_price ? Number(p.sale_price) : null,
+        })),
+      },
+    });
   } catch (err) {
     console.error('getProductBySlug error:', err);
     return res.status(500).json({ success: false, message: 'Lỗi server.' });
@@ -200,7 +229,6 @@ const getProductBySlug = async (req, res) => {
 
 // -------------------------------------------------------
 // POST /api/products  (Admin only)
-// Tạo sản phẩm + upload ảnh trong 1 request (multipart/form-data)
 // -------------------------------------------------------
 const createProduct = async (req, res) => {
   const conn = await db.getConnection();
@@ -212,11 +240,9 @@ const createProduct = async (req, res) => {
       compartments, weight_capacity, price, sale_price, stock, is_featured,
     } = req.body;
 
-    // Validate bắt buộc
     if (!category_id || !name || !slug || !sku || !price)
       return res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc.' });
 
-    // Tạo sản phẩm
     const [result] = await conn.query(
       `INSERT INTO products
          (category_id, name, slug, sku, description, material,
@@ -226,127 +252,116 @@ const createProduct = async (req, res) => {
         category_id, name.trim(), slug.trim(), sku.trim(),
         description || null, material || null,
         compartments || 1, weight_capacity || null,
-        Number(price), sale_price ? Number(sale_price) : null,
-        Number(stock || 0), is_featured === 'true' || is_featured === true ? 1 : 0,
+        Number(price),
+        sale_price ? Number(sale_price) : null,
+        Number(stock || 0),
+        is_featured === 'true' || is_featured === true ? 1 : 0,
       ]
     );
 
     const productId = result.insertId;
 
-    // Lưu ảnh đã upload
+    // Lưu ảnh Cloudinary
     if (req.files && req.files.length > 0) {
-      // const baseUrl = `${req.protocol}://${req.get('host')}`;
-      // for (let i = 0; i < req.files.length; i++) {
-      //   const file = req.files[i];
-      //   const imageUrl = `${baseUrl}/uploads/products/${file.filename}`;
       for (let i = 0; i < req.files.length; i++) {
-        const file = req.files[i];
-        // Thuộc tính path lúc này chính là URL do Cloudinary trả về
-        const imageUrl = file.path;
-        const isPrimary = i === 0; // Ảnh đầu tiên là ảnh chính
-
+        const imageUrl = getImageUrl(req.files[i]);
         await conn.query(
           `INSERT INTO product_images (product_id, image_url, is_primary, sort_order)
            VALUES (?, ?, ?, ?)`,
-          [productId, imageUrl, isPrimary, i]
+          [productId, imageUrl, i === 0 ? 1 : 0, i]
         );
       }
     }
 
     await conn.commit();
-
     return res.status(201).json({
       success: true,
       message: 'Tạo sản phẩm thành công!',
-      data: { id: productId },
+      data:    { id: productId },
     });
   } catch (err) {
     await conn.rollback();
-
-    // Xóa file đã upload nếu có lỗi
-    // if (req.files) {
-    //   req.files.forEach(file => {
-    //     try { fs.unlinkSync(file.path); } catch (_) { }
-    //   });
-    // }
-
     console.error('createProduct error:', err);
     if (err.code === 'ER_DUP_ENTRY')
       return res.status(409).json({ success: false, message: 'Slug hoặc SKU đã tồn tại.' });
-
     return res.status(500).json({ success: false, message: 'Lỗi server.' });
   } finally {
     conn.release();
   }
 };
 
+// -------------------------------------------------------
 // PUT /api/products/:id  (Admin only)
-// PUT /api/products/:id  (Admin only)
+// -------------------------------------------------------
 const updateProduct = async (req, res) => {
+  const conn = await db.getConnection();
   try {
-    const { id } = req.params;
-    const fields = req.body;
-    const allowed = [
+    await conn.beginTransaction();
+
+    const { id }     = req.params;
+    const fields     = req.body;
+    const allowedKeys = [
       'category_id', 'name', 'slug', 'sku', 'description', 'material',
       'compartments', 'weight_capacity', 'price', 'sale_price',
-      'stock', 'is_featured', 'is_active'
+      'stock', 'is_featured', 'is_active',
     ];
-    const updates = [];
-    const values = [];
 
-    allowed.forEach(key => {
+    const updates = [];
+    const values  = [];
+
+    allowedKeys.forEach(key => {
       if (fields[key] !== undefined) {
-        // FormData luôn gửi boolean dạng chuỗi 'true' hoặc 'false'
+        updates.push(`${key} = ?`);
         if (key === 'is_featured' || key === 'is_active') {
-          updates.push(`${key} = ?`);
-          values.push(fields[key] === 'true' || fields[key] === 1 ? 1 : 0);
+          values.push(fields[key] === 'true' || fields[key] === true || fields[key] === 1 ? 1 : 0);
         } else {
-          updates.push(`${key} = ?`);
           values.push(fields[key]);
         }
       }
     });
 
-    // 1. CẬP NHẬT THÔNG TIN CHỮ VÀO BẢNG products
     if (updates.length > 0) {
-      const queryValues = [...values, id];
-      await db.query(`UPDATE products SET ${updates.join(', ')} WHERE id = ?`, queryValues);
+      await conn.query(
+        `UPDATE products SET ${updates.join(', ')} WHERE id = ?`,
+        [...values, id]
+      );
     }
 
-    // 2. CẬP NHẬT ẢNH: Nếu có ảnh mới đẩy lên
+    // Thay ảnh nếu có file mới
     if (req.files && req.files.length > 0) {
-      // Xóa link ảnh cũ trong DB
-      await db.query('DELETE FROM product_images WHERE product_id = ?', [id]);
+      await conn.query('DELETE FROM product_images WHERE product_id = ?', [id]);
 
-      // Thêm ảnh mới vào DB
       for (let i = 0; i < req.files.length; i++) {
-        const imageUrl = req.files[i].path; // Link Cloudinary
-        const isPrimary = i === 0 ? 1 : 0;
-
-        await db.query(
-          `INSERT INTO product_images (product_id, image_url, is_primary, sort_order) VALUES (?, ?, ?, ?)`,
-          [id, imageUrl, isPrimary, i]
+        const imageUrl = getImageUrl(req.files[i]);
+        await conn.query(
+          `INSERT INTO product_images (product_id, image_url, is_primary, sort_order)
+           VALUES (?, ?, ?, ?)`,
+          [id, imageUrl, i === 0 ? 1 : 0, i]
         );
       }
     }
 
-    // Nếu không có chữ và cũng không có ảnh nào để cập nhật
-    if (updates.length === 0 && (!req.files || req.files.length === 0)) {
+    if (updates.length === 0 && (!req.files || req.files.length === 0))
       return res.status(400).json({ success: false, message: 'Không có dữ liệu cập nhật.' });
-    }
 
+    await conn.commit();
     return res.json({ success: true, message: 'Cập nhật sản phẩm thành công!' });
   } catch (err) {
-    console.error('Lỗi khi update sản phẩm:', err);
-    if (err.code === 'ER_DUP_ENTRY') {
+    await conn.rollback();
+    console.error('updateProduct error:', err);
+    if (err.code === 'ER_DUP_ENTRY')
       return res.status(409).json({ success: false, message: 'Slug hoặc SKU đã tồn tại.' });
-    }
     return res.status(500).json({ success: false, message: 'Lỗi server.' });
+  } finally {
+    conn.release();
   }
 };
 
 module.exports = {
-  getProducts, getFeaturedProducts, getProductBySlug,
-  createProduct, updateProduct,
-  uploadMiddleware,  // export để dùng trong route
+  getProducts,
+  getFeaturedProducts,
+  getProductBySlug,
+  createProduct,
+  updateProduct,
+  uploadMiddleware,
 };

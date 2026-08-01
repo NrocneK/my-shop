@@ -1,50 +1,69 @@
-// src/config/db.js
+// src/config/db.js  [PRODUCTION - Aiven MySQL + TiDB compatible]
 
-const mysql = require('mysql2/promise');
+const mysql  = require('mysql2/promise');
 require('dotenv').config();
 
-// IN RA LOG ĐỂ KIỂM TRA BIẾN MÔI TRƯỜNG
-console.log('=== DEBUG DB INFO ===');
+// ─── Log khi khởi động (ẩn password) ─────────────────────────
+console.log('=== DB CONFIG ===');
 console.log('HOST:', process.env.DB_HOST || 'localhost');
 console.log('PORT:', process.env.DB_PORT || 3306);
 console.log('USER:', process.env.DB_USER || 'root');
-console.log('NAME:', process.env.DB_NAME || 'myshop');
-console.log('=====================');
+console.log('NAME:', process.env.DB_NAME || 'bag_store');
+console.log('SSL: ', process.env.DB_HOST && process.env.DB_HOST !== 'localhost' ? 'ON' : 'OFF');
+console.log('=================');
 
-// 1. Tạo cấu hình cơ bản (chưa có SSL)
+// ─── Cấu hình base ────────────────────────────────────────────
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: Number(process.env.DB_PORT) || 3306,
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'myshop',
+  host:               process.env.DB_HOST     || 'localhost',
+  port:               Number(process.env.DB_PORT) || 3306,
+  user:               process.env.DB_USER     || 'root',
+  password:           process.env.DB_PASSWORD || '',
+  database:           process.env.DB_NAME     || 'bag_store',
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  charset: 'utf8mb4',
-  timezone: '+07:00'
+  connectionLimit:    10,      // Aiven free tier giới hạn connections
+  queueLimit:         0,
+  charset:            'utf8mb4',
+  timezone:           '+07:00',
+  connectTimeout:     20000,   // 20s — Aiven đôi khi khởi động chậm
 };
 
-// 2. Tự động bật SSL NẾU đang chạy trên Cloud (HOST khác localhost)
-if (process.env.DB_HOST && process.env.DB_HOST !== 'localhost') {
+// ─── Tự động bật SSL cho Cloud DB (Aiven / TiDB / PlanetScale...) ──
+// Điều kiện: HOST không phải localhost
+const isCloudDB = process.env.DB_HOST &&
+                  process.env.DB_HOST !== 'localhost' &&
+                  process.env.DB_HOST !== '127.0.0.1';
+
+if (isCloudDB) {
   dbConfig.ssl = {
-    minVersion: 'TLSv1.2',
-    rejectUnauthorized: true
+    minVersion:           'TLSv1.2',
+    rejectUnauthorized:   true,   // Bắt buộc verify certificate (Aiven yêu cầu)
   };
 }
 
-// 3. Khởi tạo pool kết nối với cấu hình tự động ở trên
+// ─── Khởi tạo connection pool ─────────────────────────────────
 const pool = mysql.createPool(dbConfig);
 
-// 4. Kiểm tra kết nối khi khởi động
+// ─── Kiểm tra kết nối khi server khởi động ────────────────────
 (async () => {
-  try {
-    const conn = await pool.getConnection();
-    console.log('✅ Kết nối MySQL thành công!');
-    conn.release();
-  } catch (err) {
-    console.error('❌ Kết nối MySQL thất bại. Chi tiết mã lỗi:', err.code, err.message);
-    process.exit(1);
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      const conn = await pool.getConnection();
+      console.log('✅ Kết nối Database thành công!');
+      conn.release();
+      break;
+    } catch (err) {
+      retries--;
+      console.error(`❌ Kết nối DB thất bại (${3 - retries}/3):`, err.code, '-', err.message);
+
+      if (retries === 0) {
+        console.error('💀 Không thể kết nối DB sau 3 lần thử. Thoát...');
+        process.exit(1);
+      }
+
+      // Đợi 3 giây rồi thử lại
+      await new Promise(r => setTimeout(r, 3000));
+    }
   }
 })();
 
