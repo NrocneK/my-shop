@@ -1,14 +1,14 @@
 // src/controllers/productController.js  [PRODUCTION - Cloudinary]
 
-const db         = require('../config/db');
-const multer     = require('multer');
+const db = require('../config/db');
+const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 // ─── Cloudinary config ────────────────────────────────────────
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
@@ -16,7 +16,7 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder:          'bagstore/products',
+    folder: 'bagstore/products',
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
     transformation: [
       { width: 800, height: 800, crop: 'limit', quality: 'auto:good' }
@@ -43,7 +43,7 @@ const getProducts = async (req, res) => {
       sort = 'newest', page = 1, limit = 12,
     } = req.query;
 
-    const where  = ['p.is_active = 1'];
+    const where = ['p.is_active = 1'];
     const params = [];
 
     if (category) {
@@ -65,14 +65,14 @@ const getProducts = async (req, res) => {
 
     const whereClause = `WHERE ${where.join(' AND ')}`;
     const sortMap = {
-      newest:     'p.created_at DESC',
-      price_asc:  'COALESCE(p.sale_price, p.price) ASC',
+      newest: 'p.created_at DESC',
+      price_asc: 'COALESCE(p.sale_price, p.price) ASC',
       price_desc: 'COALESCE(p.sale_price, p.price) DESC',
-      popular:    'p.sold_count DESC',
-      rating:     'p.rating_avg DESC',
+      popular: 'p.sold_count DESC',
+      rating: 'p.rating_avg DESC',
     };
     const orderBy = sortMap[sort] || sortMap.newest;
-    const offset  = (Number(page) - 1) * Number(limit);
+    const offset = (Number(page) - 1) * Number(limit);
 
     const [products] = await db.query(
       `SELECT
@@ -83,7 +83,7 @@ const getProducts = async (req, res) => {
          p.is_featured,
          c.name  AS category_name,
          c.slug  AS category_slug,
-         img.image_url AS primary_image
+         ANY_VALUE(img.image_url) AS primary_image
        FROM products p
        JOIN  categories c  ON p.category_id = c.id
        LEFT JOIN categories pc ON c.parent_id = pc.id
@@ -109,12 +109,12 @@ const getProducts = async (req, res) => {
       success: true,
       data: products.map(p => ({
         ...p,
-        price:      Number(p.price),
+        price: Number(p.price),
         sale_price: p.sale_price ? Number(p.sale_price) : null,
       })),
       pagination: {
-        page:        Number(page),
-        limit:       Number(limit),
+        page: Number(page),
+        limit: Number(limit),
         total,
         total_pages: Math.ceil(total / Number(limit)),
       },
@@ -147,7 +147,7 @@ const getFeaturedProducts = async (req, res) => {
       success: true,
       data: products.map(p => ({
         ...p,
-        price:      Number(p.price),
+        price: Number(p.price),
         sale_price: p.sale_price ? Number(p.sale_price) : null,
       })),
     });
@@ -182,7 +182,7 @@ const getProductBySlug = async (req, res) => {
 
     const product = products[0];
 
-    const [images]   = await db.query(
+    const [images] = await db.query(
       'SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order',
       [product.id]
     );
@@ -192,7 +192,7 @@ const getProductBySlug = async (req, res) => {
     );
 
     // FIX: Tăng limit lên 8 để carousel có đủ slide để kéo
-    const [related]  = await db.query(
+    const [related] = await db.query(
       `SELECT p.id, p.name, p.slug,
               p.price, p.sale_price,
               p.rating_avg, p.rating_count,
@@ -210,13 +210,13 @@ const getProductBySlug = async (req, res) => {
       success: true,
       data: {
         ...product,
-        price:      Number(product.price),
+        price: Number(product.price),
         sale_price: product.sale_price ? Number(product.sale_price) : null,
         images,
         variants,
         related: related.map(p => ({
           ...p,
-          price:      Number(p.price),
+          price: Number(p.price),
           sale_price: p.sale_price ? Number(p.sale_price) : null,
         })),
       },
@@ -277,7 +277,7 @@ const createProduct = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Tạo sản phẩm thành công!',
-      data:    { id: productId },
+      data: { id: productId },
     });
   } catch (err) {
     await conn.rollback();
@@ -298,8 +298,8 @@ const updateProduct = async (req, res) => {
   try {
     await conn.beginTransaction();
 
-    const { id }     = req.params;
-    const fields     = req.body;
+    const { id } = req.params;
+    const fields = req.body;
     const allowedKeys = [
       'category_id', 'name', 'slug', 'sku', 'description', 'material',
       'compartments', 'weight_capacity', 'price', 'sale_price',
@@ -307,7 +307,7 @@ const updateProduct = async (req, res) => {
     ];
 
     const updates = [];
-    const values  = [];
+    const values = [];
 
     allowedKeys.forEach(key => {
       if (fields[key] !== undefined) {
