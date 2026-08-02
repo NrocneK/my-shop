@@ -1,4 +1,4 @@
-// src/controllers/productController.js  [PRODUCTION - Cloudinary]
+// src/controllers/productController.js
 
 const db = require('../config/db');
 const multer = require('multer');
@@ -81,16 +81,15 @@ const getProducts = async (req, res) => {
          p.stock, p.sold_count,
          p.rating_avg, p.rating_count,
          p.is_featured,
-         c.name  AS category_name,
-         c.slug  AS category_slug,
-         ANY_VALUE(img.image_url) AS primary_image
+         c.name AS category_name,
+         c.slug AS category_slug,
+         (SELECT pi.image_url FROM product_images pi
+          WHERE pi.product_id = p.id AND pi.is_primary = 1
+          LIMIT 1) AS primary_image
        FROM products p
        JOIN  categories c  ON p.category_id = c.id
        LEFT JOIN categories pc ON c.parent_id = pc.id
-       LEFT JOIN product_images img
-              ON img.product_id = p.id AND img.is_primary = 1
        ${whereClause}
-       GROUP BY p.id
        ORDER BY ${orderBy}
        LIMIT ? OFFSET ?`,
       [...params, Number(limit), offset]
