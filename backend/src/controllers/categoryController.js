@@ -1,30 +1,46 @@
-// src/controllers/categoryController.js
-// Lấy danh mục sản phẩm theo dạng cây (tree)
+// src/controllers/categoryController.js  [FIX - TiDB compatible]
+// FIX: Tách COUNT query riêng thay vì GROUP BY + COUNT trong cùng 1 query
+// → Tránh lỗi only_full_group_by của TiDB
 
 const db = require('../config/db');
 
-// GET /api/categories
-// Trả về cây danh mục (cha + con)
 const getCategories = async (req, res) => {
   try {
+    // Lấy tất cả danh mục active
     const [rows] = await db.query(
-      `SELECT c.*, COUNT(p.id) AS product_count
-       FROM categories c
-       LEFT JOIN products p ON p.category_id = c.id AND p.is_active = 1
-       WHERE c.is_active = 1
-       GROUP BY c.id
-       ORDER BY c.parent_id, c.sort_order`
+      `SELECT id, parent_id, name, slug, description, icon, sort_order
+       FROM categories
+       WHERE is_active = 1
+       ORDER BY parent_id, sort_order`
     );
 
-    // Chuyển từ flat list sang dạng cây
+    // Đếm sản phẩm riêng bằng subquery — tránh GROUP BY
+    const [counts] = await db.query(
+      `SELECT category_id, COUNT(*) AS product_count
+       FROM products
+       WHERE is_active = 1
+       GROUP BY category_id`
+    );
+
+    // Map đếm theo category_id
+    const countMap = {};
+    counts.forEach(c => { countMap[c.category_id] = Number(c.product_count); });
+
+    // Gắn product_count vào từng danh mục
+    const withCount = rows.map(row => ({
+      ...row,
+      product_count: countMap[row.id] || 0,
+    }));
+
+    // Chuyển flat list → cây cha/con
     const parentMap = {};
     const tree = [];
 
-    rows.forEach(row => {
+    withCount.forEach(row => {
       parentMap[row.id] = { ...row, children: [] };
     });
 
-    rows.forEach(row => {
+    withCount.forEach(row => {
       if (row.parent_id && parentMap[row.parent_id]) {
         parentMap[row.parent_id].children.push(parentMap[row.id]);
       } else if (!row.parent_id) {

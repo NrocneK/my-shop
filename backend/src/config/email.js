@@ -1,62 +1,63 @@
-// src/config/email.js
-// Cấu hình Nodemailer + các template email
+// src/config/email.js  [PRODUCTION - Resend SDK]
+// Dùng Resend thay Nodemailer vì Render Free block cổng SMTP
+// Đăng ký free tại: https://resend.com (3000 email/tháng miễn phí)
 
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 require('dotenv').config();
 
-// Tạo transporter kết nối SMTP
-const transporter = nodemailer.createTransport({
-  host:   process.env.EMAIL_HOST   || 'smtp.gmail.com',
-  port:   Number(process.env.EMAIL_PORT) || 587,
-  secure: process.env.EMAIL_SECURE === 'true', // true = port 465, false = port 587
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// Khởi tạo Resend client
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Kiểm tra kết nối email khi khởi động
-transporter.verify((err) => {
-  if (err) {
-    console.warn('⚠️  Email chưa cấu hình hoặc thông tin sai:', err.message);
-  } else {
-    console.log('✅ Kết nối email SMTP thành công!');
-  }
-});
+// From address - phải dùng domain đã verify trên Resend
+// Nếu chưa verify domain, dùng: onboarding@resend.dev (chỉ gửi được cho email đăng ký Resend)
+const FROM_ADDRESS = process.env.EMAIL_FROM || 'BagStore <onboarding@resend.dev>';
 
-/**
- * Hàm gửi email cơ bản
- */
+// Kiểm tra cấu hình khi khởi động
+if (!process.env.RESEND_API_KEY) {
+  console.warn('⚠️  RESEND_API_KEY chưa được cấu hình — email sẽ không gửi được!');
+} else {
+  console.log('✅ Resend email đã cấu hình!');
+}
+
+// ─── Hàm gửi email cơ bản ────────────────────────────────────
 const sendMail = async ({ to, subject, html }) => {
-  return transporter.sendMail({
-    from:    process.env.EMAIL_FROM || '"BagStore" <no-reply@bagstore.vn>',
-    to,
-    subject,
-    html,
-  });
+  try {
+    const { data, error } = await resend.emails.send({
+      from: FROM_ADDRESS,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      html,
+    });
+
+    if (error) {
+      console.error('❌ Resend error:', error);
+      throw new Error(error.message);
+    }
+
+    return data;
+  } catch (err) {
+    console.error('❌ Gửi email thất bại:', err.message);
+    throw err;
+  }
 };
 
 // ============================================================
-// EMAIL TEMPLATES
+// EMAIL TEMPLATES (giữ nguyên nội dung, chỉ đổi transport)
 // ============================================================
 
-/**
- * Email xác thực tài khoản
- */
+// Email xác thực tài khoản
 const sendVerificationEmail = async (user, token) => {
   const verifyUrl = `${process.env.APP_URL}/verify-email?token=${token}`;
 
   await sendMail({
-    to:      user.email,
+    to: user.email,
     subject: '✅ Xác thực tài khoản BagStore của bạn',
     html: `
       <div style="font-family: 'DM Sans', Arial, sans-serif; max-width: 560px; margin: 0 auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-        <!-- Header -->
         <div style="background: linear-gradient(135deg, #F97316, #EA580C); padding: 2rem; text-align: center;">
           <h1 style="color: white; margin: 0; font-size: 1.5rem;">👜 BagStore</h1>
           <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0; font-size: 0.9rem;">Xác thực tài khoản</p>
         </div>
-        <!-- Body -->
         <div style="padding: 2rem;">
           <h2 style="color: #1E293B; margin-top: 0;">Chào ${user.full_name}! 👋</h2>
           <p style="color: #6B7280; line-height: 1.7;">
@@ -83,14 +84,12 @@ const sendVerificationEmail = async (user, token) => {
   });
 };
 
-/**
- * Email đặt lại mật khẩu
- */
+// Email đặt lại mật khẩu
 const sendResetPasswordEmail = async (user, token) => {
   const resetUrl = `${process.env.APP_URL}/reset-password?token=${token}`;
 
   await sendMail({
-    to:      user.email,
+    to: user.email,
     subject: '🔐 Đặt lại mật khẩu BagStore',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
@@ -122,12 +121,10 @@ const sendResetPasswordEmail = async (user, token) => {
   });
 };
 
-/**
- * Email thông báo liên hệ đến admin
- */
+// Email thông báo liên hệ đến admin
 const sendContactNotification = async (contact) => {
   await sendMail({
-    to:      process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
+    to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
     subject: `📬 Liên hệ mới từ ${contact.full_name}: ${contact.subject}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
@@ -153,12 +150,10 @@ const sendContactNotification = async (contact) => {
   });
 };
 
-/**
- * Email xác nhận gửi liên hệ cho khách
- */
+// Email xác nhận gửi liên hệ cho khách
 const sendContactConfirmation = async (contact) => {
   await sendMail({
-    to:      contact.email,
+    to: contact.email,
     subject: '✅ BagStore đã nhận tin nhắn của bạn!',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
