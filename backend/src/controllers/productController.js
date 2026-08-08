@@ -305,6 +305,8 @@ const updateProduct = async (req, res) => {
       'stock', 'is_featured', 'is_active',
     ];
 
+    const numericKeys = ['category_id', 'compartments', 'price', 'sale_price', 'stock'];
+
     const updates = [];
     const values = [];
 
@@ -313,8 +315,12 @@ const updateProduct = async (req, res) => {
         updates.push(`${key} = ?`);
         if (key === 'is_featured' || key === 'is_active') {
           values.push(fields[key] === 'true' || fields[key] === true || fields[key] === 1 ? 1 : 0);
+        } else if (numericKeys.includes(key)) {
+          // Chuỗi rỗng phải chuyển thành NULL, không được ghi '' vào cột số
+          values.push(fields[key] === '' ? null : Number(fields[key]));
         } else {
-          values.push(fields[key]);
+          // Text/varchar optional: chuỗi rỗng cũng nên lưu là NULL
+          values.push(fields[key] === '' ? null : fields[key]);
         }
       }
     });
