@@ -1,4 +1,4 @@
-/* src/components/common/PaymentModal.css  [V9] */
+/* src/components/common/PaymentModal.css  [FIX - Bank only] */
 
 /* ─── OVERLAY ─────────────────────────────────────────────── */
 .pay-modal-overlay {
@@ -12,28 +12,30 @@
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  animation: fadeIn 0.2s ease;
   overflow-y: auto;
+  animation: fadeIn 0.2s ease;
 }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* ─── MODAL ───────────────────────────────────────────────── */
 .pay-modal {
   width: 100%;
-  max-width: 480px;
+  max-width: 460px;
   max-height: 92vh;
   display: flex;
   flex-direction: column;
   background: var(--white);
   border-radius: var(--radius-lg);
-  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
   margin: auto;
-  animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow: hidden;
+  animation: modalIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @keyframes modalIn {
-  from { opacity: 0; transform: scale(0.9) translateY(20px); }
-  to   { opacity: 1; transform: scale(1)   translateY(0); }
+  from { opacity: 0; transform: scale(0.92) translateY(16px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
 }
 
 /* ─── HEADER ──────────────────────────────────────────────── */
@@ -66,7 +68,7 @@
   background: var(--primary);
   color: white;
   font-weight: 800;
-  font-size: 1.05rem;
+  font-size: 1rem;
   padding: 0.375rem 0.875rem;
   border-radius: var(--radius-full);
   white-space: nowrap;
@@ -87,56 +89,24 @@
   flex-shrink: 0;
 }
 
-.pay-close-btn:hover { background: rgba(255,255,255,0.25); }
+.pay-close-btn:hover { background: rgba(255,255,255,0.28); }
 
-/* ─── METHOD TABS ─────────────────────────────────────────── */
-.pay-method-tabs {
-  display: flex;
-  border-bottom: 1.5px solid var(--gray-200);
-  flex-shrink: 0;
-}
-
-.pay-method-tab {
-  flex: 1;
-  padding: 0.875rem 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-size: 0.825rem;
-  font-weight: 600;
-  color: var(--gray-500);
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: var(--transition);
-  border-bottom: 3px solid transparent;
-  font-family: var(--font-body);
-  text-align: center;
-  line-height: 1.3;
-}
-
-.pay-method-tab:hover { color: var(--primary); background: var(--primary-light); }
-
-.pay-method-tab.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
+/* ─── BANK TITLE ──────────────────────────────────────────── */
+.pay-bank-title {
+  padding: 0.875rem 1.5rem;
   background: var(--primary-light);
-}
-
-.method-icon {
-  font-size: 1.25rem;
-  width: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+  border-bottom: 1.5px solid var(--primary-light);
   flex-shrink: 0;
 }
 
-/* ─── MODAL BODY ──────────────────────────────────────────── */
+/* ─── BODY ────────────────────────────────────────────────── */
 .pay-modal-body {
   flex: 1;
   overflow-y: auto;
+  padding: 1.25rem 1.5rem;
   scrollbar-width: thin;
   scrollbar-color: var(--gray-300) transparent;
 }
@@ -147,24 +117,19 @@
 /* ─── LOADING ─────────────────────────────────────────────── */
 .pay-loading {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 3rem;
+  gap: 1rem;
   color: var(--primary);
 }
 
-/* ─── BANK TRANSFER ───────────────────────────────────────── */
-.pay-bank-content { padding: 1.25rem 1.5rem; }
+.pay-loading p { color: var(--gray-500); font-size: 0.875rem; }
 
-/* QR Section */
-.pay-qr-section { text-align: center; margin-bottom: 1.25rem; }
-
-.pay-qr-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--gray-700);
-  margin-bottom: 0.875rem;
-}
+/* ─── QR SECTION ──────────────────────────────────────────── */
+.pay-qr-section  { text-align: center; margin-bottom: 1.25rem; }
+.pay-qr-label    { font-size: 0.85rem; font-weight: 600; color: var(--gray-700); margin-bottom: 0.875rem; }
 
 .pay-qr-wrapper {
   width: 200px;
@@ -177,15 +142,10 @@
   background: white;
 }
 
-.pay-qr-img { width: 100%; height: 100%; object-fit: contain; }
+.pay-qr-img  { width: 100%; height: 100%; object-fit: contain; }
+.pay-qr-note { font-size: 0.75rem; color: var(--gray-400); margin-top: 0.5rem; }
 
-.pay-qr-note {
-  font-size: 0.75rem;
-  color: var(--gray-400);
-  margin-top: 0.5rem;
-}
-
-/* Divider */
+/* ─── DIVIDER ─────────────────────────────────────────────── */
 .pay-divider {
   display: flex;
   align-items: center;
@@ -203,7 +163,7 @@
   background: var(--gray-200);
 }
 
-/* Bank Info rows */
+/* ─── BANK INFO ───────────────────────────────────────────── */
 .pay-bank-info {
   background: var(--gray-100);
   border-radius: var(--radius-md);
@@ -234,6 +194,8 @@
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
+  flex: 1;
+  justify-content: flex-end;
 }
 
 .bank-info-value {
@@ -241,6 +203,7 @@
   font-weight: 600;
   color: var(--secondary);
   word-break: break-all;
+  text-align: right;
 }
 
 .bank-info-value.highlight {
@@ -264,160 +227,58 @@
   flex-shrink: 0;
 }
 
-.copy-btn:hover { border-color: var(--primary); color: var(--primary); }
+.copy-btn:hover  { border-color: var(--primary); color: var(--primary); }
 .copy-btn.copied { border-color: var(--success); color: var(--success); background: #D1FAE5; }
 
-/* Instructions */
+/* ─── INSTRUCTIONS ────────────────────────────────────────── */
 .pay-instructions {
   background: #FFFBEB;
   border: 1px solid #FDE68A;
   border-radius: var(--radius-sm);
   padding: 0.875rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .pay-inst-title { font-size: 0.825rem; font-weight: 700; color: #92400E; margin-bottom: 0.5rem; }
-.pay-inst-item  { display: flex; gap: 0.5rem; font-size: 0.8rem; color: #78350F; margin-bottom: 0.3rem; line-height: 1.5; }
-.inst-num {
-  width: 18px; height: 18px; border-radius: 50%;
-  background: #F59E0B; color: white;
-  font-size: 0.65rem; font-weight: 800;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; margin-top: 1px;
-}
 
-/* Confirm section */
-.pay-confirm-section {
-  text-align: center;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--gray-200);
-}
-
-.pay-confirm-section p {
-  font-size: 0.85rem;
-  color: var(--gray-500);
-  margin-bottom: 0.75rem;
-}
-
-/* ─── MOMO ────────────────────────────────────────────────── */
-.pay-momo-content { padding: 1.5rem; }
-
-.pay-momo-intro { text-align: center; margin-bottom: 1.5rem; }
-
-.momo-logo {
-  width: 72px;
-  height: 72px;
-  border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(167, 29, 93, 0.2);
-  margin-bottom: 0.875rem;
-}
-
-.pay-momo-intro h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.25rem; color: var(--secondary); font-family: var(--font-body); }
-.pay-momo-intro p  { font-size: 0.85rem; color: var(--gray-500); margin-bottom: 0.875rem; }
-
-.momo-amount {
-  font-size: 1.75rem;
-  font-weight: 800;
-  color: #A7195D;
-  margin-top: 0.25rem;
-}
-
-.momo-features {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.pay-inst-item {
+  display: flex;
   gap: 0.5rem;
-  margin-bottom: 1.25rem;
-}
-
-.momo-feature-item {
-  background: #FDF2F8;
-  border-radius: var(--radius-sm);
-  padding: 0.5rem 0.625rem;
-  font-size: 0.775rem;
-  color: var(--secondary);
+  font-size: 0.8rem;
+  color: #78350F;
+  margin-bottom: 0.3rem;
   line-height: 1.5;
 }
 
-.btn-momo {
-  width: 100%;
-  padding: 0.875rem 1.5rem;
-  background: linear-gradient(135deg, #A7195D, #C7205A);
-  color: white;
-  border: none;
-  border-radius: var(--radius-full);
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.625rem;
-  box-shadow: 0 4px 20px rgba(167, 25, 93, 0.35);
-  font-family: var(--font-body);
-}
-
-.btn-momo:hover:not(:disabled) {
-  background: linear-gradient(135deg, #8F1550, #A7195D);
-  box-shadow: 0 6px 24px rgba(167, 25, 93, 0.5);
-  transform: translateY(-1px);
-}
-
-.btn-momo:disabled { opacity: 0.7; cursor: not-allowed; }
-
-.momo-note {
-  text-align: center;
-  font-size: 0.78rem;
-  color: var(--gray-400);
-  margin-top: 0.75rem;
-  line-height: 1.5;
-}
-
-/* MoMo Result */
-.pay-momo-result { text-align: center; }
-
-.momo-or-open {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 1rem 0;
-}
-
-.momo-divider-line { flex: 1; height: 1px; background: var(--gray-200); }
-.momo-or-open span { font-size: 0.8rem; color: var(--gray-400); }
-
-.momo-checking {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.625rem;
-  margin-top: 1rem;
-  font-size: 0.85rem;
-  color: var(--gray-500);
-}
-
-.momo-pulse {
-  width: 10px;
-  height: 10px;
+.inst-num {
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: #A7195D;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.5; transform: scale(0.8); }
+  background: #F59E0B;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 /* ─── FOOTER ──────────────────────────────────────────────── */
 .pay-modal-footer {
-  padding: 0.875rem 1.5rem;
+  padding: 1rem 1.5rem;
   border-top: 1.5px solid var(--gray-200);
   display: flex;
-  justify-content: center;
+  gap: 0.75rem;
   flex-shrink: 0;
   background: var(--gray-100);
 }
 
-/* ─── Spinner ─────────────────────────────────────────────── */
+/* ─── UTILITIES ───────────────────────────────────────────── */
 .spinning { animation: spin 0.8s linear infinite; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
